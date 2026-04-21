@@ -129,18 +129,7 @@ import axios from 'axios'
 export default {
     data() {
         return {
-            cards: [{ // 借书证列表
-                id: 1,
-                name: '小明',
-                department: '计算机学院',
-                type: '学生'
-            }, {
-                id: 2,
-                name: '王老师',
-                department: '计算机学院',
-                type: '教师'
-            }
-            ],
+            cards: [], // 借书证列表
             Delete,
             Edit,
             Search,
@@ -164,7 +153,7 @@ export default {
                 type: '学生'
             },
             modifyCardVisible: false, // 修改信息对话框可见性
-            toModifyInfo: { // 待修改借书证信息
+            toModifyInfo: { // 待修改借书证信息；使用拷贝对象避免直接污染列表项
                 id: 0,
                 name: '',
                 department: '',
@@ -173,35 +162,64 @@ export default {
         }
     },
     methods: {
-        ConfirmNewCard() {
-            // 发出POST请求
-            axios.post("/card",
-                { // 请求体
-                    name: this.newCardInfo.name,
-                    department: this.newCardInfo.department,
-                    type: this.newCardInfo.type
-                })
-                .then(response => {
-                    ElMessage.success("借书证新建成功") // 显示消息提醒
-                    this.newCardVisible = false // 将对话框设置为不可见
-                    this.QueryCards() // 重新查询借书证以刷新页面
-                })
-        },
-        ConfirmModifyCard() {
-            // TODO: YOUR CODE HERE
-        },
-        ConfirmRemoveCard() {
-            // TODO: YOUR CODE HERE
-        },
-        QueryCards() {
-            this.cards = [] // 清空列表
-            let response = axios.get('/card') // 向/card发出GET请求
-                .then(response => {
-                    let cards = response.data // 接收响应负载
-                    cards.forEach(card => { // 对于每个借书证
-                        this.cards.push(card) // 将其加入到列表中
+        async ConfirmNewCard() {
+            try {
+                await axios.post("/card",
+                    { // 请求体直接交给后端 parseCard 映射成 Card 实体
+                        name: this.newCardInfo.name,
+                        department: this.newCardInfo.department,
+                        type: this.newCardInfo.type
                     })
+                ElMessage.success("借书证新建成功") // 显示消息提醒
+                this.newCardVisible = false // 将对话框设置为不可见
+                this.QueryCards() // 重新查询借书证以刷新页面
+            } catch (error) {
+                ElMessage.error(error.response?.data?.message || "借书证新建失败")
+            }
+        },
+        async ConfirmModifyCard() {
+            try {
+                // 修改时必须带 id，后端才能知道更新哪一张借书证。
+                await axios.put("/card", {
+                    id: this.toModifyInfo.id,
+                    name: this.toModifyInfo.name,
+                    department: this.toModifyInfo.department,
+                    type: this.toModifyInfo.type
                 })
+                ElMessage.success("借书证修改成功")
+                this.modifyCardVisible = false
+                this.QueryCards()
+            } catch (error) {
+                ElMessage.error(error.response?.data?.message || "借书证修改失败")
+            }
+        },
+        async ConfirmRemoveCard() {
+            try {
+                // DELETE 这里走 query 参数，对应后端 /card?cardId=xxx。
+                await axios.delete("/card", {
+                    params: {
+                        cardId: this.toRemove
+                    }
+                })
+                ElMessage.success("借书证删除成功")
+                this.removeCardVisible = false
+                this.QueryCards()
+            } catch (error) {
+                ElMessage.error(error.response?.data?.message || "借书证删除失败")
+            }
+        },
+        async QueryCards() {
+            this.cards = [] // 清空列表
+            try {
+                let response = await axios.get('/card') // 向/card发出GET请求
+                let cards = response.data // 接收响应负载
+                // 每次操作成功后重新拉全量列表，保证前端状态和数据库保持一致。
+                cards.forEach(card => { // 对于每个借书证
+                    this.cards.push(card) // 将其加入到列表中
+                })
+            } catch (error) {
+                ElMessage.error(error.response?.data?.message || "借书证查询失败")
+            }
         }
     },
     mounted() { // 当页面被渲染时

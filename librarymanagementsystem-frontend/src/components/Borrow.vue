@@ -32,13 +32,14 @@
 
 <script>
 import axios from 'axios';
+import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 
 export default {
     data() {
         return {
             isShow: false, // 结果表格展示状态
-            tableData: [{ // 列表项
+            tableData: [{ // 默认占位数据，真正查询后会被后端返回结果覆盖
                 cardID: 1,
                 bookID: 1,
                 borrowTime: "2024.03.04 21:48",
@@ -50,7 +51,7 @@ export default {
         }
     },
     computed: {
-        fitlerTableData() { // 搜索规则
+        fitlerTableData() { // 对后端已经返回的结果做前端二次过滤
             return this.tableData.filter(
                 (tuple) =>
                     (this.toSearch == '') || // 搜索框为空，即不搜索
@@ -63,12 +64,17 @@ export default {
     methods: {
         async QueryBorrows() {
             this.tableData = [] // 清空列表
-            let response = await axios.get('/borrow', { params: { cardID: this.toQuery } }) // 向/borrow发出GET请求，参数为cardID=this.toQuery
-            let borrows = response.data // 获取响应负载
-            borrows.forEach(borrow => { // 对于每一个借书记录
-                this.tableData.push(borrow) // 将它加入到列表项中
-            });
-            this.isShow = true // 显示结果列表
+            try {
+                // 这里的查询参数会被拼成 /borrow?cardID=xxx，由后端 BorrowHandler 接收。
+                let response = await axios.get('/borrow', { params: { cardID: this.toQuery } }) // 向/borrow发出GET请求，参数为cardID=this.toQuery
+                let borrows = response.data // 获取响应负载
+                borrows.forEach(borrow => { // 对于每一个借书记录
+                    this.tableData.push(borrow) // 将它加入到列表项中
+                });
+                this.isShow = true // 显示结果列表
+            } catch (error) {
+                ElMessage.error(error.response?.data?.message || '借书记录查询失败')
+            }
         }
     }
 }
